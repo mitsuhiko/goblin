@@ -301,11 +301,37 @@ impl<'a> Symbols<'a> {
         }
     }
 
+    /// Returns the number of symbols in the symbol table.
+    pub fn len(&self) -> usize {
+        self.nsyms as usize
+    }
+
     /// Parses a single Nlist symbol from the binary, with its accompanying name
     pub fn get(&self, index: usize) -> ::error::Result<(&'a str, Nlist)> {
         let sym: Nlist = self.data.pread_with(self.start + (index * Nlist::size_with(&self.ctx)), self.ctx)?;
         let name = self.data.pread(self.strtab + sym.n_strx)?;
         Ok((name, sym))
+    }
+
+    /// Looks for a single Nlist symbol by binary searching the file.
+    pub fn find(&self, addr: u64) -> ::error::Result<Option<(&'a str, Nlist)>> {
+        let mut low = 0;
+        let mut high = self.len();
+
+        while low < high {
+            let mid = (low + high) / 2;
+            if addr < self.get(mid as usize)?.1.n_value {
+                high = mid;
+            } else {
+                low = mid + 1;
+            }
+        }
+
+        if low > 0 && low <= self.len() {
+            Ok(Some(self.get(low - 1)?))
+        } else {
+            Ok(None)
+        }
     }
 }
 
